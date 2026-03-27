@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>💳 CC Generator</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{min-height:100vh;background:#0e0e1a;font-family:'Segoe UI',system-ui,sans-serif;color:#e2e8f0;display:flex;flex-direction:column;align-items:center;padding:40px 20px}
+    h1{font-size:2rem;font-weight:900;background:linear-gradient(135deg,#6366f1,#a855f7,#ec4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:.3rem}
+    .sub{color:#64748b;margin-bottom:2.5rem;font-size:.9rem}
+    .card{background:#161625;border:1px solid #1e1e35;border-radius:16px;padding:2rem;width:100%;max-width:680px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem}
+    label{display:block;font-size:.8rem;color:#94a3b8;margin-bottom:.4rem;text-transform:uppercase;letter-spacing:.5px}
+    input,select{width:100%;background:#0e0e1a;border:1.5px solid #2a2a45;border-radius:10px;padding:.85rem 1rem;color:#e2e8f0;font-size:.95rem;outline:none;transition:.2s}
+    input:focus,select:focus{border-color:#6366f1}
+    input::placeholder{color:#3a3a5c}
+    select option{background:#0e0e1a}
+    .gen-btn{width:100%;background:linear-gradient(135deg,#6366f1,#a855f7);border:none;padding:1.1rem;border-radius:12px;color:#fff;font-size:1.05rem;font-weight:700;cursor:pointer;transition:.2s}
+    .gen-btn:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(99,102,241,.4)}
+    .gen-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+    .results{margin-top:1.5rem;display:none}
+    .results-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem}
+    .results-title{font-weight:700;color:#c4b5fd;font-size:.95rem}
+    .header-btns{display:flex;gap:.5rem}
+    .action-btn{background:#1e1e35;border:1px solid #2a2a45;color:#94a3b8;padding:.45rem .9rem;border-radius:8px;cursor:pointer;font-size:.8rem;transition:.2s}
+    .action-btn:hover{background:#2a2a45;color:#e2e8f0}
+    .output-box{background:#0a0a14;border:1px solid #1e1e35;border-radius:10px;padding:1.25rem;font-family:'Courier New',monospace;font-size:.9rem;white-space:pre;word-break:break-all;color:#a5b4fc;max-height:420px;overflow-y:auto;line-height:1.9;letter-spacing:.3px}
+    .output-box::-webkit-scrollbar{width:5px}
+    .output-box::-webkit-scrollbar-thumb{background:#2a2a45;border-radius:999px}
+    .meta-bar{display:flex;gap:1rem;margin-bottom:1rem;flex-wrap:wrap}
+    .meta{background:#13132a;border:1px solid #1e1e35;border-radius:8px;padding:.5rem 1rem;font-size:.8rem}
+    .meta-val{font-weight:700;color:#818cf8}
+    .meta-lbl{color:#4a4a6a;font-size:.72rem}
+    .err{margin-top:.75rem;padding:.75rem 1rem;background:#1a0a0a;border:1px solid #4a1a1a;border-radius:8px;color:#f87171;font-size:.88rem;display:none}
+    .spinner{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:.5rem}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    footer{margin-top:2rem;color:#2a2a45;font-size:.73rem;text-align:center}
+  </style>
+</head>
+<body>
+  <h1>💳 CC Generator</h1>
+  <p class="sub">Luhn-valid test cards — for development &amp; testing only</p>
+
+  <div class="card">
+    <div class="grid">
+      <div>
+        <label>BIN (4–6 digits)</label>
+        <input id="bin" type="text" placeholder="e.g. 411111" maxlength="6"/>
+      </div>
+      <div>
+        <label>Quantity (max 500)</label>
+        <input id="count" type="number" value="10" min="1" max="500"/>
+      </div>
+      <div>
+        <label>Card Brand (optional)</label>
+        <select id="brand">
+          <option value="">Auto-detect</option>
+          <option value="visa">Visa</option>
+          <option value="mastercard">Mastercard</option>
+          <option value="amex">American Express</option>
+          <option value="discover">Discover</option>
+        </select>
+      </div>
+      <div style="display:flex;align-items:flex-end">
+        <button class="gen-btn" id="genBtn" onclick="generate()" style="margin-bottom:0">⚡ Generate</button>
+      </div>
+    </div>
+    <div class="err" id="err"></div>
+  </div>
+
+  <div class="card results" id="results">
+    <div class="meta-bar" id="metaBar"></div>
+    <div class="results-header">
+      <span class="results-title" id="rTitle">Output: CARD|MM|YY|CVV</span>
+      <div class="header-btns">
+        <button class="action-btn" onclick="copyAll()">📋 Copy</button>
+        <button class="action-btn" onclick="downloadTxt()">⬇ Download</button>
+      </div>
+    </div>
+    <div class="output-box" id="output"></div>
+  </div>
+
+  <footer>For development &amp; testing purposes only · Not for real transactions</footer>
+
+  <script>
+    let outputText = '';
+
+    document.getElementById('bin').addEventListener('input', e => {
+      e.target.value = e.target.value.replace(/\D/g,'').slice(0,6);
+    });
+    document.getElementById('bin').addEventListener('keydown', e => {
+      if(e.key === 'Enter') generate();
+    });
+
+    async function generate() {
+      const bin = document.getElementById('bin').value.trim();
+      const count = Math.min(parseInt(document.getElementById('count').value)||10, 500);
+      const brand = document.getElementById('brand').value;
+      const btn = document.getElementById('genBtn');
+      const errEl = document.getElementById('err');
+
+      errEl.style.display = 'none';
+      if(!/^\d{4,6}$/.test(bin)){
+        errEl.textContent = '❌ BIN must be 4–6 digits';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>Generating...';
+
+      try {
+        const res = await fetch('/api/generate', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ bin, count, brand: brand||undefined, format:'pipe' })
+        });
+        const data = await res.json();
+        if(!res.ok) throw new Error(data.error || 'Failed');
+
+        // Build pipe-format output
+        const lines = data.cards.map(c => {
+          const [mm, yy] = c.expiry.split('/');
+          return `${c.cardNumber}|${mm}|${yy}|${c.cvv}`;
+        });
+        outputText = lines.join('\n');
+
+        document.getElementById('results').style.display = 'block';
+        document.getElementById('output').textContent = outputText;
+        document.getElementById('rTitle').textContent = `${lines.length} cards — CARD|MM|YY|CVV`;
+
+        // Meta bar
+        const brands = {};
+        data.cards.forEach(c => brands[c.brand]=(brands[c.brand]||0)+1);
+        document.getElementById('metaBar').innerHTML =
+          `<div class="meta"><div class="meta-val">${lines.length}</div><div class="meta-lbl">Generated</div></div>` +
+          Object.entries(brands).map(([b,n]) =>
+            `<div class="meta"><div class="meta-val">${n}</div><div class="meta-lbl">${b}</div></div>`
+          ).join('');
+
+      } catch(e) {
+        errEl.textContent = '❌ ' + e.message;
+        errEl.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '⚡ Generate';
+      }
+    }
+
+    function copyAll(){
+      navigator.clipboard.writeText(outputText).then(() => {
+        const b = document.querySelectorAll('.action-btn')[0];
+        b.textContent = '✅ Copied!';
+        setTimeout(()=>b.textContent='📋 Copy',2000);
+      });
+    }
+
+    function downloadTxt(){
+      const blob = new Blob([outputText], {type:'text/plain'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `cards_${document.getElementById('bin').value}.txt`;
+      a.click();
+    }
+  </script>
+</body>
+</html>
