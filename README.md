@@ -24,7 +24,7 @@ A sleek, web-based **credit card number generator** that produces Luhn-valid tes
 ## 📦 Installation
 
 ```bash
-git clone https://github.com/yourusername/cc-generator.git
+git clone https://github.com/blaxkmiradev/cc-generator.git
 cd cc-generator
 npm install
 npm start
